@@ -1,0 +1,580 @@
+-- Load MacLib UI Library
+local MacLib = loadstring(game:HttpGet("https://github.com/biggaboy212/Maclib/releases/latest/download/maclib.txt"))()
+
+-- Services
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Players = game:GetService("Players")
+local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
+
+-- Knit Services Path
+local KnitServices = ReplicatedStorage
+    :WaitForChild("Packages")
+    :WaitForChild("_Index")
+    :WaitForChild("sleitnick_knit@1.7.0")
+    :WaitForChild("knit")
+    :WaitForChild("Services")
+
+-- Locate Remote Functions (with pcall fallback)
+local AddKickRF, HitWallRF, RebirthRF, RollRF, OpenEggRF
+pcall(function()
+    AddKickRF = KnitServices:WaitForChild("KickService"):WaitForChild("RF"):WaitForChild("AddKick")
+end)
+pcall(function()
+    HitWallRF = KnitServices:WaitForChild("BreakWallService"):WaitForChild("RF"):WaitForChild("HitWall")
+end)
+pcall(function()
+    RebirthRF = KnitServices:WaitForChild("RebirthService"):WaitForChild("RF"):WaitForChild("Rebirth")
+end)
+pcall(function()
+    RollRF = KnitServices:WaitForChild("TitleService"):WaitForChild("RF"):WaitForChild("Roll")
+end)
+pcall(function()
+    OpenEggRF = KnitServices:WaitForChild("EggService"):WaitForChild("RF"):WaitForChild("OpenEgg")
+end)
+
+-- Toggle, Slider, Speed, Dropdown States
+local autoClickEnabled = false
+local autoHitWallEnabled = false
+local autoRebirthEnabled = false
+local autoRollEnabled = false
+local autoOpenEggEnabled = false
+local selectedEgg = "Basic"
+local autoClickSpeed = 0.1
+local autoHitWallSpeed = 0.1
+local walkSpeedValue = 16
+local jumpPowerValue = 50
+local infJumpEnabled = false
+local noclipEnabled = false
+
+-- Local Player
+local LocalPlayer = Players.LocalPlayer
+
+-- Custom Asset ID from User (Used only for the floating toggle button now)
+local customIconAsset = "rbxassetid://102231995614328"
+
+-- Auto Click Loop
+task.spawn(function()
+    while true do
+        if autoClickEnabled and AddKickRF then
+            pcall(function()
+                AddKickRF:InvokeServer()
+            end)
+            task.wait(autoClickSpeed)
+        else
+            task.wait(0.5)
+        end
+    end
+end)
+
+-- Auto Hit Wall Loop
+task.spawn(function()
+    while true do
+        if autoHitWallEnabled and HitWallRF then
+            pcall(function()
+                HitWallRF:InvokeServer()
+            end)
+            task.wait(autoHitWallSpeed)
+        else
+            task.wait(0.5)
+        end
+    end
+end)
+
+-- Auto Rebirth Loop
+task.spawn(function()
+    while true do
+        if autoRebirthEnabled and RebirthRF then
+            pcall(function()
+                RebirthRF:InvokeServer()
+            end)
+            task.wait(1.0) -- Rebirth interval
+        else
+            task.wait(0.5)
+        end
+    end
+end)
+
+-- Auto Roll Loop
+task.spawn(function()
+    while true do
+        if autoRollEnabled and RollRF then
+            pcall(function()
+                RollRF:InvokeServer()
+            end)
+            task.wait(0.5) -- Delay between rolls to prevent server lag
+        else
+            task.wait(0.5)
+        end
+    end
+end)
+
+-- Auto Open Egg Loop
+task.spawn(function()
+    while true do
+        if autoOpenEggEnabled and OpenEggRF then
+            pcall(function()
+                OpenEggRF:InvokeServer(selectedEgg)
+            end)
+            task.wait(0.8) -- Delay between egg opens
+        else
+            task.wait(0.5)
+        end
+    end
+end)
+
+-- Infinite Jump Connection
+UserInputService.JumpRequest:Connect(function()
+    if infJumpEnabled then
+        local character = LocalPlayer.Character
+        if character then
+            local humanoid = character:FindFirstChildOfClass("Humanoid")
+            if humanoid then
+                humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
+            end
+        end
+    end
+end)
+
+-- NoClip Loop using RunService Stepped
+RunService.Stepped:Connect(function()
+    if noclipEnabled then
+        local character = LocalPlayer.Character
+        if character then
+            for _, part in ipairs(character:GetDescendants()) do
+                if part:IsA("BasePart") and part.CanCollide then
+                    part.CanCollide = false
+                end
+            end
+        end
+    end
+end)
+
+-- Apply WalkSpeed / JumpPower on spawn & changes
+local function applyCharacterSettings(character)
+    local humanoid = character:WaitForChild("Humanoid", 5)
+    if humanoid then
+        humanoid.WalkSpeed = walkSpeedValue
+        humanoid.UseJumpPower = true
+        humanoid.JumpPower = jumpPowerValue
+        
+        -- Listener to prevent local resetting of values
+        humanoid:GetPropertyChangedSignal("WalkSpeed"):Connect(function()
+            if humanoid.WalkSpeed ~= walkSpeedValue then
+                humanoid.WalkSpeed = walkSpeedValue
+            end
+        end)
+        
+        humanoid:GetPropertyChangedSignal("JumpPower"):Connect(function()
+            if humanoid.JumpPower ~= jumpPowerValue then
+                humanoid.JumpPower = jumpPowerValue
+            end
+        end)
+    end
+end
+
+if LocalPlayer.Character then
+    task.spawn(applyCharacterSettings, LocalPlayer.Character)
+end
+LocalPlayer.CharacterAdded:Connect(function(char)
+    applyCharacterSettings(char)
+end)
+
+-- Responsive UI Sizing: Adjusts based on Screen Viewport Size
+local camera = workspace.CurrentCamera
+local viewport = camera.ViewportSize
+local screenX = viewport.X > 0 and viewport.X or 1024
+local screenY = viewport.Y > 0 and viewport.Y or 768
+
+local windowSize
+if screenX < 800 or screenY < 600 then
+    windowSize = UDim2.fromOffset(math.clamp(screenX * 0.9, 320, 600), math.clamp(screenY * 0.85, 260, 420))
+else
+    windowSize = UDim2.fromOffset(800, 520)
+end
+
+-- Create the UI Window
+local Window = MacLib:Window({
+    Title = "Zerose Hub",
+    Subtitle = "By Zerose",
+    Size = windowSize,
+    DragStyle = 1,
+    ShowUserInfo = true,
+    Keybind = Enum.KeyCode.RightControl -- Press Right Control to toggle menu visibility on PC
+})
+
+-- Configure global settings in the top-right globe button
+local globalSettings = {
+    UIBlurToggle = Window:GlobalSetting({
+        Name = "UI Blur",
+        Default = Window:GetAcrylicBlurState(),
+        Callback = function(bool)
+            Window:SetAcrylicBlurState(bool)
+        end,
+    }),
+    NotificationToggler = Window:GlobalSetting({
+        Name = "Notifications",
+        Default = Window:GetNotificationsState(),
+        Callback = function(bool)
+            Window:SetNotificationsState(bool)
+        end,
+    }),
+    ShowUserInfo = Window:GlobalSetting({
+        Name = "Show User Info",
+        Default = Window:GetUserInfoState(),
+        Callback = function(bool)
+            Window:SetUserInfoState(bool)
+        end,
+    })
+}
+
+-- Create Tab Group
+local TabGroup = Window:TabGroup()
+
+-- Tab 1: Main (No image icon)
+local MainTab = TabGroup:Tab({
+    Name = "Main"
+})
+
+local ClickSection = MainTab:Section({
+    Name = "Auto Click Settings",
+    Side = "Left"
+})
+
+local RebirthSection = MainTab:Section({
+    Name = "Auto Rebirth Settings",
+    Side = "Left"
+})
+
+local HitSection = MainTab:Section({
+    Name = "Auto Hit Wall Settings",
+    Side = "Right"
+})
+
+local RollSection = MainTab:Section({
+    Name = "Auto Roll Settings",
+    Side = "Right"
+})
+
+-- Auto Click Settings
+ClickSection:Toggle({
+    Name = "Enable Auto Click",
+    Default = false,
+    Callback = function(state)
+        autoClickEnabled = state
+    end
+}, "AutoClickToggle")
+
+ClickSection:Slider({
+    Name = "Click Delay (Seconds)",
+    Minimum = 0.01,
+    Maximum = 2.0,
+    Default = 0.1,
+    Precision = 2,
+    Callback = function(value)
+        autoClickSpeed = value
+    end
+}, "AutoClickSpeed")
+
+-- Auto Rebirth Settings
+RebirthSection:Toggle({
+    Name = "Enable Auto Rebirth",
+    Default = false,
+    Callback = function(state)
+        autoRebirthEnabled = state
+    end
+}, "AutoRebirthToggle")
+
+-- Auto Hit Wall Settings
+HitSection:Toggle({
+    Name = "Enable Auto Hit Wall",
+    Default = false,
+    Callback = function(state)
+        autoHitWallEnabled = state
+    end
+}, "AutoHitWallToggle")
+
+HitSection:Slider({
+    Name = "Hit Delay (Seconds)",
+    Minimum = 0.01,
+    Maximum = 2.0,
+    Default = 0.1,
+    Precision = 2,
+    Callback = function(value)
+        autoHitWallSpeed = value
+    end
+}, "AutoHitWallSpeed")
+
+-- Auto Roll Settings
+RollSection:Toggle({
+    Name = "Enable Auto Roll",
+    Default = false,
+    Callback = function(state)
+        autoRollEnabled = state
+    end
+}, "AutoRollToggle")
+
+-- Tab 2: Eggs (No image icon)
+local EggTab = TabGroup:Tab({
+    Name = "Eggs"
+})
+
+local EggSection = EggTab:Section({
+    Name = "Auto Open Egg Settings",
+    Side = "Left"
+})
+
+EggSection:Dropdown({
+    Name = "Select Egg Type",
+    Multi = false,
+    Required = true,
+    Options = {"Basic", "Tung", "Ballerina", "Tralala", "OdinDin", "LaVaca", "Strawberry"},
+    Default = 1,
+    Callback = function(value)
+        selectedEgg = value
+    end
+}, "SelectedEggDropdown")
+
+EggSection:Toggle({
+    Name = "Enable Auto Open",
+    Default = false,
+    Callback = function(state)
+        autoOpenEggEnabled = state
+    end
+}, "AutoOpenEggToggle")
+
+-- Tab 3: Character Modifications (No image icon)
+local CharTab = TabGroup:Tab({
+    Name = "Character"
+})
+
+local SpeedJumpSection = CharTab:Section({
+    Name = "Movement Adjustments",
+    Side = "Left"
+})
+
+local TogglesSection = CharTab:Section({
+    Name = "Movement Cheats",
+    Side = "Right"
+})
+
+-- WalkSpeed Slider
+SpeedJumpSection:Slider({
+    Name = "Walk Speed",
+    Minimum = 16,
+    Maximum = 250,
+    Default = 16,
+    Precision = 0,
+    Callback = function(value)
+        walkSpeedValue = value
+        local character = LocalPlayer.Character
+        if character then
+            local humanoid = character:FindFirstChildOfClass("Humanoid")
+            if humanoid then
+                humanoid.WalkSpeed = value
+            end
+        end
+    end
+}, "WalkSpeedSlider")
+
+-- JumpPower Slider
+SpeedJumpSection:Slider({
+    Name = "Jump Power",
+    Minimum = 50,
+    Maximum = 500,
+    Default = 50,
+    Precision = 0,
+    Callback = function(value)
+        jumpPowerValue = value
+        local character = LocalPlayer.Character
+        if character then
+            local humanoid = character:FindFirstChildOfClass("Humanoid")
+            if humanoid then
+                humanoid.UseJumpPower = true
+                humanoid.JumpPower = value
+            end
+        end
+    end
+}, "JumpPowerSlider")
+
+-- Infinite Jump Toggle
+TogglesSection:Toggle({
+    Name = "Infinite Jump",
+    Default = false,
+    Callback = function(state)
+        infJumpEnabled = state
+    end
+}, "InfiniteJumpToggle")
+
+-- NoClip Toggle
+TogglesSection:Toggle({
+    Name = "NoClip",
+    Default = false,
+    Callback = function(state)
+        noclipEnabled = state
+    end
+}, "NoClipToggle")
+
+-- Tab 4: Settings & Credits (No image icon)
+local SettingsTab = TabGroup:Tab({
+    Name = "Settings"
+})
+
+-- กำหนดชื่อโฟลเดอร์สำหรับเซฟการตั้งค่าของ Zerose Hub
+MacLib:SetFolder("ZeroseHub")
+
+-- โหลดโมดูลระบบบันทึก Config อัตโนมัติในฝั่งซ้ายของแท็บ
+SettingsTab:InsertConfigSection("Left")
+
+-- Credits Section on Right Column
+local CreditsSection = SettingsTab:Section({
+    Name = "Credits & Support",
+    Side = "Right"
+})
+
+CreditsSection:Paragraph({
+    Header = "Zerose Hub v1.0.0",
+    Body = "Lead Developer: Zero\nUI Framework: MacLib\n\nขอให้สนุกกับการฟาร์มครับ! หากพบปัญหาหรือต้องการความช่วยเหลือ สามารถกดคัดลอกลิงก์ดิสคอร์ดหรือปิดสคริปต์ได้ด้านล่างนี้"
+})
+
+CreditsSection:Button({
+    Name = "Copy Discord Invite Link",
+    Callback = function()
+        local discordLink = "https://discord.gg/cg6NVPcFYw"
+        local success = pcall(function()
+            if setclipboard then
+                setclipboard(discordLink)
+            elseif toclipboard then
+                toclipboard(discordLink)
+            else
+                error("No clipboard support")
+            end
+        end)
+        
+        if success then
+            Window:Notify({
+                Title = "Zerose Hub",
+                Description = "คัดลอกลิงก์ Discord ลงคลิปบอร์ดแล้ว!",
+                Lifetime = 3
+            })
+        else
+            Window:Notify({
+                Title = "Zerose Hub",
+                Description = "เกิดข้อผิดพลาด สามารถเข้าร่วมได้ที่: " .. discordLink,
+                Lifetime = 6
+            })
+        end
+    end
+})
+
+CreditsSection:Button({
+    Name = "Unload Script",
+    Callback = function()
+        Window:Dialog({
+            Title = "Unload Zerose Hub",
+            Description = "คุณแน่ใจหรือไม่ว่าจะทำการปิดสคริปต์นี้?",
+            Buttons = {
+                {
+                    Name = "Confirm",
+                    Callback = function()
+                        Window:Unload()
+                    end
+                },
+                {
+                    Name = "Cancel"
+                }
+            }
+        })
+    end
+})
+
+-- โฟกัสไปที่แท็บแรกเมื่อเข้าสคริปต์ครั้งแรก
+MainTab:Select()
+
+-- ตรวจสอบและโหลด Config ตัวล่าล่าสุดที่บันทึกเป็น Auto Load (ถ้ามี)
+MacLib:LoadAutoLoadConfig()
+
+-- ==========================================
+-- สร้างปุ่มลอยเพื่อสลับการเปิด/ปิด UI (สำหรับมือถือและคอม)
+-- ==========================================
+local toggleButtonGui = Instance.new("ScreenGui")
+toggleButtonGui.Name = "MacLibToggleGui"
+toggleButtonGui.ResetOnSpawn = false
+toggleButtonGui.Parent = RunService:IsStudio() 
+    and LocalPlayer:FindFirstChild("PlayerGui")
+    or (gethui and gethui())
+    or (cloneref and cloneref(game:GetService("CoreGui")) or game:GetService("CoreGui"))
+
+local floatButton = Instance.new("ImageButton")
+floatButton.Name = "ToggleButton"
+floatButton.Size = UDim2.fromOffset(55, 55)
+floatButton.Position = UDim2.new(0.02, 0, 0.2, 0)
+floatButton.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+floatButton.BorderSizePixel = 0
+floatButton.Image = customIconAsset
+floatButton.Active = true
+
+local corner = Instance.new("UICorner")
+corner.CornerRadius = UDim.new(0, 28)
+corner.Parent = floatButton
+
+local stroke = Instance.new("UIStroke")
+stroke.Color = Color3.fromRGB(255, 255, 255)
+stroke.Transparency = 0.8
+stroke.Parent = floatButton
+
+local buttonPadding = Instance.new("UIPadding")
+buttonPadding.PaddingBottom = UDim.new(0, 8)
+buttonPadding.PaddingTop = UDim.new(0, 8)
+buttonPadding.PaddingLeft = UDim.new(0, 8)
+buttonPadding.PaddingRight = UDim.new(0, 8)
+buttonPadding.Parent = floatButton
+
+floatButton.Parent = toggleButtonGui
+
+-- เขียนโค้ดระบบการลากปุ่มลอย (Drag System) เพื่อความลื่นไหลและเสถียร
+local dragging = false
+local dragInput, dragStart, startPos
+
+local function update(input)
+    local delta = input.Position - dragStart
+    floatButton.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+end
+
+floatButton.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        dragging = true
+        dragStart = input.Position
+        startPos = floatButton.Position
+        
+        input.Changed:Connect(function()
+            if input.UserInputState == Enum.UserInputState.End then
+                dragging = false
+            end
+        end)
+    end
+end)
+
+floatButton.InputChanged:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+        dragInput = input
+    end
+end)
+
+UserInputService.InputChanged:Connect(function(input)
+    if input == dragInput and dragging then
+        update(input)
+    end
+end)
+
+-- ควบคุมเปิด/ปิด หน้าต่างหลักของ UI เมื่อคลิกปุ่มลอย
+floatButton.MouseButton1Click:Connect(function()
+    if Window then
+        Window:SetState(not Window:GetState())
+    end
+end)
+
+-- ทำลายปุ่มลอยทิ้งเมื่อทำการปิดสคริปต์อย่างถาวร
+Window.onUnloaded(function()
+    toggleButtonGui:Destroy()
+end)
